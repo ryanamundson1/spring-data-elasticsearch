@@ -995,6 +995,59 @@ public class ElasticsearchTemplateTests {
 		elasticsearchTemplate.clearScroll(scrollId);
 		assertThat(sampleEntities.size(), is(equalTo(30)));
 	}
+	
+	/*
+    DATAES-533
+     */
+	@Test
+    public void shouldSortResultsWithScanAndScrollForGivenSortCriteria() {
+        // given
+        List<IndexQuery> indexQueries = new ArrayList<>();
+        // first document
+        String documentId = randomNumeric(5);
+        SampleEntity sampleEntity1 = SampleEntity.builder().id(documentId)
+                .message("abc")
+                .rate(10)
+                .version(System.currentTimeMillis()).build();
+
+        // second document
+        String documentId2 = randomNumeric(5);
+        SampleEntity sampleEntity2 = SampleEntity.builder().id(documentId2)
+                .message("xyz")
+                .rate(5)
+                .version(System.currentTimeMillis()).build();
+
+        // third document
+        String documentId3 = randomNumeric(5);
+        SampleEntity sampleEntity3 = SampleEntity.builder().id(documentId3)
+                .message("xyz")
+                .rate(15)
+                .version(System.currentTimeMillis()).build();
+
+        indexQueries = getIndexQueries(Arrays.asList(sampleEntity1, sampleEntity2, sampleEntity3));
+
+        elasticsearchTemplate.bulkIndex(indexQueries);
+        elasticsearchTemplate.refresh(SampleEntity.class);
+
+        SearchQuery searchQuery = new NativeSearchQueryBuilder().withQuery(matchAllQuery())
+                .withPageable(new PageRequest(0, 10, new Sort(
+                    new Sort.Order(Sort.Direction.ASC, "rate"))))
+                .build();
+        
+
+        Page<SampleEntity> scroll = elasticsearchTemplate.startScroll(1000, searchQuery, SampleEntity.class);
+        String scrollId = ((ScrolledPage) scroll).getScrollId();
+        List<SampleEntity> sampleEntities = new ArrayList<>();
+        while (scroll.hasContent()) {
+            sampleEntities.addAll(scroll.getContent());
+            scrollId = ((ScrolledPage) scroll).getScrollId();
+            scroll = elasticsearchTemplate.continueScroll(scrollId, 1000, SampleEntity.class);
+        }
+        elasticsearchTemplate.clearScroll(scrollId);
+        
+        assertThat(sampleEntities.size(), is(equalTo(3)));
+        assertThat(sampleEntities.get(0).getRate(), is(sampleEntity2.getRate()));
+    }
 
 	/*
 	DATAES-167

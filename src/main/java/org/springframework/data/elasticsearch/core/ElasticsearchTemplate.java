@@ -79,6 +79,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Order;
 import org.springframework.data.elasticsearch.ElasticsearchException;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Mapping;
@@ -747,6 +748,14 @@ public class ElasticsearchTemplate implements ElasticsearchOperations, Applicati
 		if (!isEmpty(query.getFields())) {
 			requestBuilder.setFetchSource(toArray(query.getFields()), null);
 		}
+		
+		if (query.getSort() != null) {
+            for (Sort.Order order : query.getSort()) {
+                requestBuilder.addSort(order.getProperty(),
+                        order.getDirection() == Sort.Direction.DESC ? SortOrder.DESC : SortOrder.ASC);
+            }
+        }
+		
 		return requestBuilder;
 	}
 
